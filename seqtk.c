@@ -287,9 +287,10 @@ int stk_trimfq(int argc, char *argv[])
 	kseq_t *seq;
 	double param = 0.05, q_int2real[128];
 	int i, c, min_len = 30, left = 0, right = 0, fixed_len = -1;
-	while ((c = getopt(argc, argv, "l:q:b:e:L:c:")) >= 0) {
+	while ((c = getopt(argc, argv, "l:q:Q:b:e:L:c:")) >= 0) {
 		switch (c) {
 			case 'q': param = atof(optarg); break;
+			case 'Q': param = pow(10., -(atoi(optarg)) / 10.); break;
 			case 'l': min_len = atoi(optarg); break;
 			case 'b': left = atoi(optarg); break;
 			case 'e': right = atoi(optarg); break;
@@ -307,7 +308,6 @@ int stk_trimfq(int argc, char *argv[])
 		fprintf(stderr, "         -b INT      trim INT bp from left (non-zero to disable -q/-l) [0]\n");
 		fprintf(stderr, "         -e INT      trim INT bp from right (non-zero to disable -q/-l) [0]\n");
 		fprintf(stderr, "         -L INT      retain at most INT bp from the 5'-end (non-zero to disable -q/-l) [0]\n");
-		fprintf(stderr, "         -Q          force FASTQ output\n");
 		fprintf(stderr, "\n");
 		return 1;
 	}
