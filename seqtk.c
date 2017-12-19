@@ -279,22 +279,30 @@ krint64_t kr_rand(krand_t *kr)
 int stk_trimfq(int argc, char *argv[])
 { // FIXME: when a record with zero length will always be treated as a fasta record
 	gzFile fp;
+	FILE* cpfp;
+	char cpfname[4096]; strcpy(cpfname,"");
+	if ( 0 != strcmp(cpfname,"") ) {
+		fputs("Filename not correctly initialized",stderr); return 1;
+	}
 	kseq_t *seq;
 	double param = 0.05, q_int2real[128];
 	int i, c, min_len = 30, left = 0, right = 0, fixed_len = -1;
-	while ((c = getopt(argc, argv, "l:q:b:e:L:")) >= 0) {
+	while ((c = getopt(argc, argv, "l:q:b:e:L:c:")) >= 0) {
 		switch (c) {
 			case 'q': param = atof(optarg); break;
 			case 'l': min_len = atoi(optarg); break;
 			case 'b': left = atoi(optarg); break;
 			case 'e': right = atoi(optarg); break;
 			case 'L': fixed_len = atoi(optarg); break;
+			case 'c': strcpy(cpfname,optarg); break;
 		}
 	}
 	if (optind == argc) {
 		fprintf(stderr, "\n");
 		fprintf(stderr, "Usage:   seqtk trimfq [options] <in.fq>\n\n");
 		fprintf(stderr, "Options: -q FLOAT    error rate threshold (disabled by -b/-e) [%.2f]\n", param);
+		fprintf(stderr, "         -Q INT      Phred error rate threshold (disabled by -b/-e)\n");
+		fprintf(stderr, "         -c STRING   Filename to output the cut points to\n");
 		fprintf(stderr, "         -l INT      discard sequences shorter than INT bp after trimming (disabled by -b/-e) [%d]\n", min_len);
 		fprintf(stderr, "         -b INT      trim INT bp from left (non-zero to disable -q/-l) [0]\n");
 		fprintf(stderr, "         -e INT      trim INT bp from right (non-zero to disable -q/-l) [0]\n");
@@ -307,6 +315,14 @@ int stk_trimfq(int argc, char *argv[])
 	if (fp == 0) {
 		fprintf(stderr, "[E::%s] failed to open the input file/stream.\n", __func__);
 		return 1;
+	}
+	cpfp=0;
+	if ( 0 != strcmp(cpfname,"") ) {
+		cpfp = fopen(cpfname,"w");
+		if (cpfp == 0) {
+			fprintf(stderr, "[E::%s] failed to open cutpoints output file.\n", __func__);
+			return 1;
+		}
 	}
 	seq = kseq_init(fp);
 	for (i = 0; i < 128; ++i)
@@ -333,14 +349,22 @@ int stk_trimfq(int argc, char *argv[])
 
 			if (end - beg < min_len) { // too short, discard sequence 
 				beg=-1;
-                end=-1;
+				end=-1;
 			}
 		} else beg = -1, end = -1;
 
-        
-        
-        if (beg == -1) continue; // sequence has been discarded, skip to next
-        
+		if ( 0 != strcmp(cpfname,"") ) {
+			// write cutpoints (muber of bases to cut) info to file
+			// identifier \t left \t right
+			fputs(seq->name.s,cpfp);
+			fputc('\t',cpfp); fprintf(cpfp,"%d",beg);
+			fputc('\t',cpfp); fprintf(cpfp,"%zd", (end==-1)? (size_t)end : seq->seq.l - end);
+			//fputc('\t',cpfp); fprintf(cpfp,"%zd",seq->seq.l);
+			fputc('\n',cpfp);
+		}
+
+		if (beg == -1) continue; // sequence has been discarded, skip to next
+
 		putchar(seq->is_fastq? '@' : '>'); fputs(seq->name.s, stdout); 
 		if (seq->comment.l) {
 			putchar(' '); puts(seq->comment.s);
@@ -352,6 +376,7 @@ int stk_trimfq(int argc, char *argv[])
 		}
 	}
 	kseq_destroy(seq);
+	if (cpfp != 0) fclose(cpfp);
 	gzclose(fp);
 	return 0;
 }
