@@ -295,7 +295,7 @@ int stk_trimfq(int argc, char *argv[])
 		fprintf(stderr, "\n");
 		fprintf(stderr, "Usage:   seqtk trimfq [options] <in.fq>\n\n");
 		fprintf(stderr, "Options: -q FLOAT    error rate threshold (disabled by -b/-e) [%.2f]\n", param);
-		fprintf(stderr, "         -l INT      maximally trim down to INT bp (disabled by -b/-e) [%d]\n", min_len);
+		fprintf(stderr, "         -l INT      discard sequences shorter than INT bp after trimming (disabled by -b/-e) [%d]\n", min_len);
 		fprintf(stderr, "         -b INT      trim INT bp from left (non-zero to disable -q/-l) [0]\n");
 		fprintf(stderr, "         -e INT      trim INT bp from right (non-zero to disable -q/-l) [0]\n");
 		fprintf(stderr, "         -L INT      retain at most INT bp from the 5'-end (non-zero to disable -q/-l) [0]\n");
@@ -328,20 +328,19 @@ int stk_trimfq(int argc, char *argv[])
 				if (s < 0) s = 0, tmp = i + 1;
 			}
 
-			/* max never set; all low qual, just give first min_len bp */
-			if (max == 0.) beg = 0, end = min_len;
+			/* max never set; all low quality, discard whole sequence */
+			if (max == 0.) beg = -1, end = -1;
 
-			if (end - beg < min_len) { // window-based 
-				int is, imax;
-				for (i = 0, is = 0; i < min_len; ++i)
-					is += seq->qual.s[i] - 33;
-				for (imax = is, beg = 0; i < seq->qual.l; ++i) {
-					is += (int)seq->qual.s[i] - seq->qual.s[i - min_len];
-					if (imax < is) imax = is, beg = i - min_len + 1;
-				}
-				end = beg + min_len;
+			if (end - beg < min_len) { // too short, discard sequence 
+				beg=-1;
+                end=-1;
 			}
-		} else beg = 0, end = seq->seq.l;
+		} else beg = -1, end = -1;
+
+        
+        
+        if (beg == -1) continue; // sequence has been discarded, skip to next
+        
 		putchar(seq->is_fastq? '@' : '>'); fputs(seq->name.s, stdout); 
 		if (seq->comment.l) {
 			putchar(' '); puts(seq->comment.s);
